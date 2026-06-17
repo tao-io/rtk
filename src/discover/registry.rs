@@ -38,6 +38,7 @@ pub fn category_avg_tokens(category: &str, subcmd: &str) -> usize {
         "Infra" => 120,
         "Network" => 150,
         "GitHub" => 200,
+        "GitLab" => 200,
         "PackageManager" => 150,
         _ => 150,
     }
@@ -1727,6 +1728,55 @@ mod tests {
     }
 
     #[test]
+    fn test_classify_glab_mr() {
+        assert!(matches!(
+            classify_command("glab mr list"),
+            Classification::Supported {
+                rtk_equivalent: "rtk glab",
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn test_classify_glab_ci() {
+        assert!(matches!(
+            classify_command("glab ci list"),
+            Classification::Supported {
+                rtk_equivalent: "rtk glab",
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn test_classify_glab_release() {
+        assert!(matches!(
+            classify_command("glab release list"),
+            Classification::Supported {
+                rtk_equivalent: "rtk glab",
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn test_rewrite_glab_mr_list() {
+        assert_eq!(
+            rewrite_command("glab mr list", &[]),
+            Some("rtk glab mr list".into())
+        );
+    }
+
+    #[test]
+    fn test_rewrite_glab_ci_status() {
+        assert_eq!(
+            rewrite_command("glab ci status", &[]),
+            Some("rtk glab ci status".into())
+        );
+    }
+
+    #[test]
     fn test_classify_cargo_install() {
         assert!(matches!(
             classify_command("cargo install rtk"),
@@ -2721,23 +2771,59 @@ mod tests {
     #[test]
     fn test_rewrite_pnpm_command() {
         let commands = vec![
-            "exec",
-            "i",
-            "install",
-            "list",
-            "ls",
-            "outdated",
-            "run",
-            "run-script",
+            ("exec", "rtk pnpm exec"),
+            ("i", "rtk pnpm i"),
+            ("install", "rtk pnpm install"),
+            ("list", "rtk pnpm list"),
+            ("ls", "rtk pnpm ls"),
+            ("outdated", "rtk pnpm outdated"),
+            ("run", "rtk pnpm run"),
+            ("run-script", "rtk pnpm run-script"),
+            ("build", "rtk pnpm build"),
+            ("test:coverage", "rtk pnpm test:coverage"),
+            ("l2 -- --human", "rtk pnpm l2 -- --human"),
         ];
-        for command in commands {
+        for (command, expected) in commands {
             assert_eq!(
                 rewrite_command(format!("pnpm {command}").as_str(), &[]),
-                Some(format!("rtk pnpm {command}")),
+                Some(expected.to_string()),
                 "Failed for command: pnpm {}",
                 command
             );
         }
+    }
+
+    #[test]
+    fn test_rewrite_npm_bare_subcommand() {
+        let commands = vec!["exec", "run", "run-script", "x"];
+        for command in commands {
+            assert_eq!(
+                rewrite_command(format!("npm {command}").as_str(), &[]),
+                Some(format!("rtk npm {command}")),
+                "Failed for bare command: npm {}",
+                command
+            );
+        }
+    }
+
+    #[test]
+    fn test_rewrite_npm_with_args() {
+        assert_eq!(
+            rewrite_command("npm run test", &[]),
+            Some("rtk npm run test".to_string()),
+        );
+        assert_eq!(
+            rewrite_command("npm exec vitest", &[]),
+            Some("rtk vitest".to_string()),
+        );
+    }
+
+    #[test]
+    fn test_rewrite_compound_pnpm_and_git() {
+        assert_eq!(
+            rewrite_command("pnpm build && git status", &[]),
+            Some("rtk pnpm build && rtk git status".into())
+        );
     }
 
     #[test]
